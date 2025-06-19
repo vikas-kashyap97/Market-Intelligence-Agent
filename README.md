@@ -296,6 +296,10 @@ For support, questions, or feature requests:
 - Check the troubleshooting section
 - Review the documentation
 
+## 📄 License
+
+This project is licensed under the MIT License - see the [MIT License](LICENSE) file for details.
+
 ---
 
 **🚀 Market Intelligence Agent v2.0** - Transforming market research with AI-powered multi-agent workflows.
