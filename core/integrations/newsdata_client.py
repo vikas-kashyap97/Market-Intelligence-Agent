@@ -20,60 +20,50 @@ class NewsDataClient:
         try:
             # Add API key to params
             params["apikey"] = self.api_key
-            
-            # Make request
-            response = requests.get(f"{self.base_url}/{endpoint}", params=params)
-            
-            # Handle different HTTP status codes as per documentation
+        
+            # Make request with timeout
+            response = requests.get(f"{self.base_url}/{endpoint}", params=params, timeout=30)
+        
+            # Log the request for debugging
+            logger.info(f"NewsData.io request: {endpoint} with params: {list(params.keys())}")
+        
+            # Handle different HTTP status codes
             if response.status_code == 200:
-                return response.json()
-            elif response.status_code == 400:
-                logger.error(f"Bad Request (400): Parameter missing or malformed - {response.text}")
-                return {"status": "error", "code": 400, "message": "Parameter missing or malformed"}
-            elif response.status_code == 401:
-                logger.error(f"Unauthorized (401): Invalid API key - {response.text}")
-                return {"status": "error", "code": 401, "message": "Invalid API key"}
-            elif response.status_code == 403:
-                logger.error(f"Forbidden (403): CORS policy failed or IP/Domain restricted - {response.text}")
-                return {"status": "error", "code": 403, "message": "Access forbidden"}
-            elif response.status_code == 409:
-                logger.error(f"Conflict (409): Parameter duplicate - {response.text}")
-                return {"status": "error", "code": 409, "message": "Parameter duplicate"}
-            elif response.status_code == 422:
-                logger.error(f"Unprocessable Entity (422): Query malformed - {response.text}")
-                return {"status": "error", "code": 422, "message": "Query malformed or invalid"}
-            elif response.status_code == 429:
-                logger.error(f"Too Many Requests (429): Rate limit exceeded - {response.text}")
-                return {"status": "error", "code": 429, "message": "Rate limit exceeded"}
-            elif response.status_code == 500:
-                logger.error(f"Internal Server Error (500): Server error - {response.text}")
-                return {"status": "error", "code": 500, "message": "Internal server error"}
+                data = response.json()
+                # Check if the response has the expected structure
+                if data.get("status") == "success":
+                    logger.info(f"NewsData.io success: Retrieved {len(data.get('results', []))} articles")
+                    return data
+                else:
+                    logger.error(f"NewsData.io API error: {data}")
+                    return {"status": "error", "message": data.get("message", "Unknown API error")}
             else:
-                logger.error(f"Unexpected status code {response.status_code}: {response.text}")
-                return {"status": "error", "code": response.status_code, "message": "Unexpected error"}
-                
+                logger.error(f"NewsData.io HTTP error {response.status_code}: {response.text}")
+                return {"status": "error", "code": response.status_code, "message": response.text}
+            
+        except requests.exceptions.Timeout:
+            logger.error("NewsData.io request timeout")
+            return {"status": "error", "message": "Request timeout"}
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed: {str(e)}")
-            return {"status": "error", "code": 0, "message": f"Request failed: {str(e)}"}
+            logger.error(f"NewsData.io request failed: {str(e)}")
+            return {"status": "error", "message": f"Request failed: {str(e)}"}
     
     def _sanitize_query(self, query: str) -> str:
         """Sanitize query according to NewsData.io requirements"""
         if not query:
             return ""
-        
-        # Remove extra whitespace and limit to 100 characters as per API docs
-        clean_query = query.strip()[:100]
-        
-        # Remove duplicate words while preserving order
-        words = clean_query.split()
-        seen = set()
-        unique_words = []
-        for word in words:
-            if word.lower() not in seen:
-                seen.add(word.lower())
-                unique_words.append(word)
-        
-        return " ".join(unique_words)
+    
+        # Clean and limit query
+        clean_query = query.strip()
+    
+        # Remove special characters that might cause issues
+        import re
+        clean_query = re.sub(r'[^\w\s-]', ' ', clean_query)
+    
+        # Limit to reasonable length and remove extra spaces
+        clean_query = ' '.join(clean_query.split())[:80]
+    
+        return clean_query
     
     def get_latest_news(self, query: str = None, language: str = "en", country: str = None, 
                        category: str = None, size: int = 10) -> List[Dict[str, Any]]:
@@ -83,34 +73,41 @@ class NewsDataClient:
                 "language": language,
                 "size": min(size, 50)  # API limit is 50
             }
-            
-            # Add optional parameters
+        
+            # Add query if provided
             if query:
                 sanitized_query = self._sanitize_query(query)
                 if sanitized_query:
                     params["q"] = sanitized_query
-            
+                    logger.info(f"NewsData.io query: {sanitized_query}")
+        
+            # Add optional parameters
             if country:
                 params["country"] = country
             if category:
                 params["category"] = category
-            
+        
             # Make request
             response_data = self._make_request("latest", params)
-            
+        
             # Check if request was successful
             if response_data.get("status") != "success":
-                logger.error(f"API request failed: {response_data.get('message', 'Unknown error')}")
+                logger.error(f"NewsData.io API request failed: {response_data.get('message', 'Unknown error')}")
                 return []
-            
+        
             # Process articles
             articles = []
-            for article in response_data.get("results", []):
+            results = response_data.get("results", [])
+        
+            for article in results:
+                if not article:  # Skip empty articles
+                    continue
+                
                 processed_article = {
                     "article_id": article.get("article_id", ""),
                     "title": article.get("title", ""),
                     "description": article.get("description", ""),
-                    "content": article.get("content", ""),
+                    "content": article.get("content", article.get("description", "")),  # Fallback to description
                     "url": article.get("link", ""),
                     "source": article.get("source_id", ""),
                     "source_name": article.get("source_name", ""),
@@ -124,17 +121,20 @@ class NewsDataClient:
                     "ai_tag": article.get("ai_tag", []),
                     "duplicate": article.get("duplicate", False)
                 }
-                articles.append(processed_article)
             
-            logger.info(f"Retrieved {len(articles)} news articles for query: {query}")
-            
-            # Add small delay to respect rate limits
+                # Only add articles with meaningful content
+                if processed_article["title"] or processed_article["description"]:
+                    articles.append(processed_article)
+        
+            logger.info(f"NewsData.io: Successfully processed {len(articles)} articles from {len(results)} results")
+        
+            # Add delay to respect rate limits
             time.sleep(self.rate_limit_delay)
-            
+        
             return articles
-            
+        
         except Exception as e:
-            logger.error(f"Failed to get latest news: {str(e)}")
+            logger.error(f"NewsData.io get_latest_news failed: {str(e)}")
             return []
     
     def get_news_by_domain(self, domain: str, query: str = None, size: int = 10) -> List[Dict[str, Any]]:

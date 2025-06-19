@@ -7,13 +7,12 @@ from core.agents.analyst_agent import AnalystAgent
 from core.agents.strategist_agent import StrategistAgent
 from core.agents.formatter_agent import FormatterAgent
 from core.agents.base_agent import AgentStatus
-from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 class AgentOrchestrator:
     """Orchestrates the multi-agent workflow for market intelligence"""
-    
+
     def __init__(self):
         self.agents = {
             "reader": ReaderAgent(),
@@ -99,6 +98,7 @@ class AgentOrchestrator:
             final_results = {
                 "success": True,
                 "workflow_id": f"workflow_{int(self.start_time.timestamp())}",
+                "state_id": f"workflow_{int(self.start_time.timestamp())}",  # Add state_id
                 "query": query,
                 "market_domain": market_domain,
                 "question": question,
@@ -136,6 +136,9 @@ class AgentOrchestrator:
             
             self.results = final_results
             
+            # Save to database
+            await self._save_analysis_to_history(final_results)
+            
             logger.info(f"Workflow completed successfully in {final_results['duration']:.2f} seconds")
             return final_results
             
@@ -150,12 +153,14 @@ class AgentOrchestrator:
                 "success": False,
                 "error": error_message,
                 "workflow_id": f"workflow_{int(self.start_time.timestamp()) if self.start_time else 0}",
+                "state_id": f"workflow_{int(self.start_time.timestamp()) if self.start_time else 0}",
                 "query": query,
                 "market_domain": market_domain,
+                "question": question,
                 "failed_step": self.current_step,
                 "progress": self.progress
             }
-    
+
     def get_workflow_status(self) -> Dict[str, Any]:
         """Get current workflow status"""
         agent_statuses = {}
@@ -176,7 +181,7 @@ class AgentOrchestrator:
             "duration": duration,
             "agent_statuses": agent_statuses
         }
-    
+
     async def cancel_workflow(self):
         """Cancel the running workflow"""
         try:
@@ -195,13 +200,13 @@ class AgentOrchestrator:
             
         except Exception as e:
             logger.error(f"Failed to cancel workflow: {str(e)}")
-    
+
     def get_agent_logs(self, agent_name: str) -> List[str]:
         """Get logs for a specific agent"""
         # This would return agent-specific logs
         # For now, return a placeholder
         return [f"Log entry for {agent_name}"]
-    
+
     async def run_single_agent(self, agent_name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Run a single agent for testing or debugging"""
         if agent_name not in self.agents:
@@ -216,3 +221,32 @@ class AgentOrchestrator:
         except Exception as e:
             logger.error(f"Single agent {agent_name} failed: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    async def _save_analysis_to_history(self, results: Dict[str, Any]):
+        """Save completed analysis to history database"""
+        try:
+            from core.db import DatabaseManager
+            from core.state import MarketIntelligenceState
+            
+            # Create a state object from results
+            state = MarketIntelligenceState(
+                state_id=results.get("state_id", results.get("workflow_id", "unknown")),
+                query=results.get("query", ""),
+                market_domain=results.get("market_domain", ""),
+                question=results.get("question", ""),
+                report_dir=results.get("report_dir", ""),
+                market_trends=results.get("market_trends", []),
+                opportunities=results.get("opportunities", []),
+                strategic_recommendations=results.get("strategic_recommendations", [])
+            )
+            
+            db = DatabaseManager()
+            success = db.save_state(state)
+            
+            if success:
+                logger.info(f"Analysis {state.state_id[:8]} saved to history")
+            else:
+                logger.error(f"Failed to save analysis {state.state_id[:8]} to history")
+                
+        except Exception as e:
+            logger.error(f"Error saving analysis to history: {str(e)}")

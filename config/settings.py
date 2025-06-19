@@ -48,8 +48,17 @@ class Settings:
     @classmethod
     def validate(cls):
         """Validate required environment variables"""
-        required_vars = ["GOOGLE_API_KEY", "TAVILY_API_KEY", "FIRECRAWL_API_KEY", "NEWSDATA_IO_KEY", "GROQ_API_KEY"]
-        missing = [var for var in required_vars if not getattr(cls, var)]
-        if missing:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+        required_vars = ["GOOGLE_API_KEY", "TAVILY_API_KEY"]
+        optional_vars = ["FIRECRAWL_API_KEY", "NEWSDATA_IO_KEY", "GROQ_API_KEY"]
+        
+        missing_required = [var for var in required_vars if not getattr(cls, var)]
+        if missing_required:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing_required)}")
+        
+        missing_optional = [var for var in optional_vars if not getattr(cls, var)]
+        if missing_optional:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Missing optional environment variables (some features may be limited): {', '.join(missing_optional)}")
+        
         return True

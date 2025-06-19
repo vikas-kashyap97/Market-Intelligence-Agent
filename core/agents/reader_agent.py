@@ -18,7 +18,18 @@ class ReaderAgent(BaseAgent):
             description="Collects data from web sources, news APIs, and documents"
         )
         self.firecrawl = FirecrawlClient()
-        self.newsdata = NewsDataClient()
+        
+        # Initialize NewsData client with error handling
+        try:
+            if Settings.NEWSDATA_IO_KEY:
+                self.newsdata = NewsDataClient()
+                logger.info("NewsData.io client initialized successfully")
+            else:
+                self.newsdata = None
+                logger.warning("NewsData.io API key not found - news collection will be limited")
+        except Exception as e:
+            logger.error(f"Failed to initialize NewsData.io client: {str(e)}")
+            self.newsdata = None
     
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute data collection tasks"""
@@ -30,13 +41,25 @@ class ReaderAgent(BaseAgent):
         # Collect data from multiple sources concurrently
         tasks = [
             self._collect_web_content(query, market_domain),
-            self._collect_news_data(query, market_domain),
-            self._collect_trending_topics()
         ]
+        
+        # Only add news collection if NewsData client is available
+        if self.newsdata:
+            tasks.append(self._collect_news_data(query, market_domain))
+            tasks.append(self._collect_trending_topics())
+        else:
+            logger.warning("NewsData.io not available - skipping news collection")
         
         self.update_progress(30, "Collecting data from sources")
         
-        web_content, news_data, trending_topics = await asyncio.gather(*tasks)
+        if len(tasks) == 1:
+            # Only web content
+            web_content = await tasks[0]
+            news_data = []
+            trending_topics = []
+        else:
+            # Web content + news data
+            web_content, news_data, trending_topics = await asyncio.gather(*tasks)
         
         self.update_progress(80, "Processing collected data")
         
@@ -85,41 +108,76 @@ class ReaderAgent(BaseAgent):
     async def _collect_news_data(self, query: str, market_domain: str) -> List[Dict[str, Any]]:
         """Collect news data using NewsData.io"""
         try:
-            # Get latest news
+            logger.info(f"NewsData.io: Starting news collection for '{query}' in {market_domain}")
+            
+            # Create comprehensive search query
             news_query = f"{query} {market_domain}"
-            news_articles = self.newsdata.get_latest_news(news_query, size=15)
+            
+            # Try to get news with the query
+            news_articles = self.newsdata.get_latest_news(news_query, size=20)
+            
+            # If no results with combined query, try with just the query
+            if not news_articles and query != market_domain:
+                logger.info(f"NewsData.io: Retrying with query only: {query}")
+                news_articles = self.newsdata.get_latest_news(query, size=15)
+            
+            # If still no results, try with just market domain
+            if not news_articles:
+                logger.info(f"NewsData.io: Retrying with market domain: {market_domain}")
+                news_articles = self.newsdata.get_latest_news(market_domain, size=15)
             
             # Process news articles
             processed_articles = []
             for article in news_articles:
-                if article.get("title") and article.get("description"):
-                    processed_articles.append({
-                        "source": "news_api",
-                        "title": article.get("title", ""),
-                        "description": article.get("description", ""),
-                        "content": article.get("content", "")[:1500],
-                        "url": article.get("url", ""),
-                        "published_date": article.get("published_date", ""),
-                        "news_source": article.get("source", ""),
-                        "category": article.get("category", [])
-                    })
-            
-            logger.info(f"Collected {len(processed_articles)} news articles")
+                if not article:
+                    continue
+                
+                # Ensure we have meaningful content
+                title = article.get("title", "").strip()
+                description = article.get("description", "").strip()
+                content = article.get("content", "").strip()
+                
+                if not title and not description:
+                    continue
+                
+                processed_article = {
+                    "source": "newsdata_io",
+                    "title": title,
+                    "description": description,
+                    "content": content or description,  # Use description if no content
+                    "url": article.get("url", ""),
+                    "published_date": article.get("published_date", ""),
+                    "news_source": article.get("source_name", article.get("source", "")),
+                    "category": article.get("category", []),
+                    "keywords": article.get("keywords", []),
+                    "country": article.get("country", []),
+                    "language": article.get("language", ""),
+                    "article_id": article.get("article_id", "")
+                }
+                processed_articles.append(processed_article)
+        
+            logger.info(f"NewsData.io: Successfully collected {len(processed_articles)} news articles")
             return processed_articles
             
         except Exception as e:
-            logger.error(f"Failed to collect news data: {str(e)}")
+            logger.error(f"NewsData.io: Failed to collect news data: {str(e)}")
             return []
     
     async def _collect_trending_topics(self) -> List[Dict[str, Any]]:
         """Collect trending topics"""
         try:
+            logger.info("NewsData.io: Collecting trending topics")
             trending = self.newsdata.get_trending_topics()
-            logger.info(f"Collected {len(trending)} trending topics")
-            return trending
             
+            if trending:
+                logger.info(f"NewsData.io: Collected {len(trending)} trending topics")
+            else:
+                logger.warning("NewsData.io: No trending topics retrieved")
+            
+            return trending
+        
         except Exception as e:
-            logger.error(f"Failed to collect trending topics: {str(e)}")
+            logger.error(f"NewsData.io: Failed to collect trending topics: {str(e)}")
             return []
     
     async def _process_collected_data(self, web_content: List[Dict], news_data: List[Dict], 

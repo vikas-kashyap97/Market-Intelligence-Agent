@@ -8,20 +8,20 @@ def render_home_ui():
     """Render the enhanced home interface with multi-agent workflow"""
     st.title("🚀 Advanced Market Intelligence")
     st.markdown("Generate comprehensive market intelligence reports with AI-powered multi-agent analysis")
-    
+
     # Initialize session state
     if 'orchestrator' not in st.session_state:
         st.session_state.orchestrator = AgentOrchestrator()
-    
+
     if 'analysis_complete' not in st.session_state:
         st.session_state.analysis_complete = False
-    
+
     if 'current_results' not in st.session_state:
         st.session_state.current_results = None
-    
+
     # Main input section
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         st.subheader("📊 Analysis Configuration")
         
@@ -72,7 +72,7 @@ def render_home_ui():
             type="primary",
             disabled=st.session_state.get('workflow_running', False)
         )
-    
+
     with col2:
         st.subheader("🎯 What You'll Get")
         
@@ -97,14 +97,14 @@ def render_home_ui():
         - Contextual charts
         - Exportable reports
         """)
-    
+
     # Load existing analysis section
     st.markdown("---")
     st.subheader("📋 Previous Analyses")
-    
+
     db = DatabaseManager()
     previous_states = db.get_all_states()
-    
+
     if previous_states:
         col1, col2 = st.columns([3, 1])
         
@@ -123,8 +123,10 @@ def render_home_ui():
                     st.session_state.current_results = {
                         "success": True,
                         "workflow_id": loaded_state.state_id,
+                        "state_id": loaded_state.state_id,  # Add this field
                         "query": loaded_state.query,
                         "market_domain": loaded_state.market_domain,
+                        "question": getattr(loaded_state, 'question', ''),  # Add question field
                         "report_dir": loaded_state.report_dir,
                         "market_trends": loaded_state.market_trends,
                         "opportunities": loaded_state.opportunities,
@@ -143,7 +145,7 @@ def render_home_ui():
                     st.rerun()
     else:
         st.info("No previous analyses found. Run your first analysis to see it here!")
-    
+
     # Run analysis workflow
     if run_analysis:
         if not query.strip():
@@ -186,8 +188,12 @@ def render_home_ui():
             progress_bar.progress(100)
             status_text.success("✅ Analysis completed!")
             
-            # Store results
+            # Store results with all required fields
             st.session_state.current_results = results
+            # Ensure state_id is available
+            if 'state_id' not in results:
+                results['state_id'] = results.get('workflow_id', 'unknown')
+            
             st.session_state.analysis_complete = True
             st.session_state.workflow_running = False
             
@@ -249,7 +255,7 @@ def render_home_ui():
                 - NEWSDATA_IO_KEY (for news data)
                 - GROQ_API_KEY (for AI assistant)
                 """)
-    
+
     # Display current results if available
     if st.session_state.analysis_complete and st.session_state.current_results:
         results = st.session_state.current_results
@@ -339,7 +345,7 @@ def render_home_ui():
         
         else:
             st.error("Analysis failed. Please try again with different parameters.")
-    
+
     elif not st.session_state.analysis_complete:
         # Show welcome message and features
         st.markdown("---")
@@ -417,3 +423,6 @@ def render_home_ui():
             - Async Workflows
             - Multi-Agent System
             """)
+
+def ui_home():
+    render_home_ui()

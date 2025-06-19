@@ -6,45 +6,71 @@ def render_history_ui():
     """Render the analysis history interface"""
     st.title("📚 Analysis History")
     
-    db = DatabaseManager()
+    try:
+        db = DatabaseManager()
+        
+        # Get all previous analyses
+        states = db.get_all_states()
+        
+        if not states:
+            st.info("📭 No previous analyses found. Run your first analysis to see it here!")
+            
+            # Show debug info
+            with st.expander("🔧 Debug Information"):
+                st.write("Database path:", db.db_path if hasattr(db, 'db_path') else "Unknown")
+                st.write("Session state keys:", list(st.session_state.keys()))
+                if 'current_results' in st.session_state:
+                    st.write("Current results:", st.session_state.current_results)
+            return
+        
+        st.markdown(f"### 📊 Found {len(states)} previous analyses")
+        
+        # Display analyses in a more organized way
+        for i, state in enumerate(states):
+            # Create a more informative title
+            title = f"🔍 {state.get('market_domain', 'Unknown')} Analysis"
+            query = state.get('query') or state.get('question', 'General Analysis')
+            if query and query != 'N/A':
+                title += f" - {query[:50]}{'...' if len(query) > 50 else ''}"
+            
+            with st.expander(f"{title} ({state.get('id', 'unknown')[:8]})"):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Market Domain", state.get('market_domain', 'Unknown'))
+                
+                with col2:
+                    query_text = state.get('query') or state.get('question', 'General Analysis')
+                    st.metric("Query", query_text if query_text != 'N/A' else 'General Analysis')
+                
+                with col3:
+                    created_at = state.get('created_at', 'Unknown')
+                    if created_at != 'Unknown':
+                        try:
+                            created_date = datetime.fromisoformat(created_at).strftime("%Y-%m-%d %H:%M")
+                        except:
+                            created_date = created_at
+                    else:
+                        created_date = 'Unknown'
+                    st.metric("Created", created_date)
+                
+                # Action buttons
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button(f"📂 Load Analysis", key=f"load_{i}"):
+                        load_analysis(state.get('id'))
+                
+                with col2:
+                    if st.button(f"🗑️ Delete", key=f"delete_{i}"):
+                        delete_analysis(state.get('id'))
+                
+                with col3:
+                    st.text(f"ID: {state.get('id', 'unknown')[:8]}")
     
-    # Get all previous analyses
-    states = db.get_all_states()
-    
-    if not states:
-        st.info("📭 No previous analyses found. Run your first analysis to see it here!")
-        return
-    
-    st.markdown(f"### 📊 Found {len(states)} previous analyses")
-    
-    # Display analyses in a table format
-    for i, state in enumerate(states):
-        with st.expander(f"🔍 {state['market_domain']} - {state['query']} ({state['id'][:8]})"):
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("Market Domain", state['market_domain'])
-            
-            with col2:
-                st.metric("Query", state['query'] if state['query'] != 'N/A' else 'General Analysis')
-            
-            with col3:
-                created_date = datetime.fromisoformat(state['created_at']).strftime("%Y-%m-%d %H:%M")
-                st.metric("Created", created_date)
-            
-            # Action buttons
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button(f"📂 Load Analysis", key=f"load_{i}"):
-                    load_analysis(state['id'])
-            
-            with col2:
-                if st.button(f"🗑️ Delete", key=f"delete_{i}"):
-                    delete_analysis(state['id'])
-            
-            with col3:
-                st.text(f"ID: {state['id'][:8]}")
+    except Exception as e:
+        st.error(f"❌ Error loading history: {str(e)}")
+        st.write("Debug info:", str(e))
     
     # Bulk operations
     st.markdown("---")
