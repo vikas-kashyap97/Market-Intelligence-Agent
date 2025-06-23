@@ -160,46 +160,6 @@ Input → Reader Agent → Analyst Agent → Strategist Agent → Formatter Agen
 4. **Formatting**: Formatter Agent creates reports and visualizations
 5. **Interaction**: Assistant provides ongoing support and Q&A
 
-## 📁 Project Structure
-
-\`\`\`
-market_intel_streamlit_app/
-├── app.py                          # Main Streamlit application
-├── config/
-│   └── settings.py                 # Configuration and environment variables
-├── core/
-│   ├── agents/                     # Multi-agent system
-│   │   ├── base_agent.py          # Base agent class
-│   │   ├── reader_agent.py        # Data collection agent
-│   │   ├── analyst_agent.py       # Analysis agent
-│   │   ├── strategist_agent.py    # Strategy agent
-│   │   └── formatter_agent.py     # Report formatting agent
-│   ├── integrations/              # External API integrations
-│   │   ├── firecrawl_client.py    # Firecrawl API client
-│   │   ├── newsdata_client.py     # NewsData.io client
-│   │   └── groq_client.py         # Groq API client
-│   ├── charts/
-│   │   └── intelligent_charts.py  # AI-powered chart generation
-│   ├── export/
-│   │   └── report_exporter.py     # Multi-format export
-│   ├── workflow/
-│   │   └── agent_orchestrator.py  # Workflow orchestration
-│   ├── db.py                      # Database management
-│   ├── state.py                   # State management
-│   └── utils.py                   # Utility functions
-├── components/                     # UI components
-│   ├── ui_home.py                 # Home interface
-│   ├── ui_dashboard.py            # Dashboard interface
-│   ├── ui_report.py               # Report interface
-│   ├── ui_assistant.py            # AI assistant interface
-│   └── ui_history.py              # History management
-├── reports/                       # Generated reports
-├── exports/                       # Export files
-├── requirements.txt               # Dependencies
-├── .env.example                   # Environment template
-└── README.md                      # This file
-\`\`\`
-
 ## 🔍 Usage Examples
 
 ### Basic Market Analysis
