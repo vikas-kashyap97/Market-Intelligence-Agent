@@ -60,9 +60,13 @@ Edit `.env` with your API keys:
 \`\`\`env
 # Core APIs (Required)
 GOOGLE_API_KEY=your_google_api_key_here
+
 TAVILY_API_KEY=your_tavily_api_key_here
+
 FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+
 NEWSDATA_IO_KEY=your_newsdata_io_key_here
+
 GROQ_API_KEY=your_groq_api_key_here
 
 # Optional
