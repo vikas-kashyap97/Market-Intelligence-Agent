@@ -2,6 +2,7 @@
 
 Let me introduce a production-ready, advanced market intelligence platform powered by multi-agent AI workflows, real-time data integration, and interactive dashboards using Streamlit.
 
+
 ## 🌟 New Features in v2.0
 
 ### 🔥 Real-Time Data Integration
