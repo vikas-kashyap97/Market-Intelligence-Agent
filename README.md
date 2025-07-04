@@ -1,7 +1,6 @@
 # 🚀 Market Intelligence Agent v2.0
 
-Let me introduce a production-ready, advanced market intelligence platform powered by multi-agent AI workflows, real-time data integration, and interactive dashboards using Streamlit.
-
+Let me introduce a production-ready, advanced market intelligence platform powered by multi-agent AI workflows, real-time data integration, and interactive dashboards using Streamlit that automate the end-to-end process of data aggregation, insight generation, and decision support for strategic business planning.
 
 ## 🌟 New Features in v2.0
 
